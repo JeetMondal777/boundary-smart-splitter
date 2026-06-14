@@ -1,0 +1,62 @@
+[build-system]
+requires = ["setuptools>=61.2", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "boundary-smart-splitter"
+version = "1.0.0"
+description = "A context-aware, boundary-respecting text splitter for Python."
+readme = "README.md"
+license = "MIT"
+authors = [ { name = "Jeet Mondal", email = "JeetMondal777@users.noreply.github.com" }
+]
+keywords = ["text", "splitter", "nlp", "chunking", "langchain"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Text Processing :: Linguistic",
+]
+requires-python = ">=3.8"
+dependencies = []
+
+[project.optional-dependencies]
+langchain = ["langchain-text-splitters>=0.0.1"]
+dev = ["pytest>=7.0", "pytest-cov", "black", "ruff", "mypy"]
+
+[project.urls]
+Homepage = "https://github.com/JeetMondal777/boundary-smart-splitter"
+Repository = "https://github.com/JeetMondal777/boundary-smart-splitter"
+Issues = "https://github.com/JeetMondal777/boundary-smart-splitter/issues"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["boundary_smart_splitter*"]
+
+[tool.setuptools.package-data]
+"boundary_smart_splitter" = ["py.typed"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+addopts = "-v --tb=short"
+
+[tool.black]
+line-length = 88
+target-version = ['py38']
+
+[tool.ruff]
+line-length = 88
+select = ["E", "F", "W", "I", "N", "UP", "B", "C4", "SIM"]
+
+[tool.mypy]
+python_version = "3.8"
+warn_return_any = true
+disallow_untyped_defs = true
+ignore_missing_imports = true
