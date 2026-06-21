@@ -1,0 +1,15 @@
+[Page 1]
+JOURNAL OF ARTIFICIAL INTELLIGENCE RESEARCH, VOL. 88, 2026
+
+Attention Is All You Need (Extracted Text)
+Abstract
+The dominant sequence transduction models are based on complex recurrent or convolutional neural networks.
+
+1. Introduction
+Sequence transduction models, especially recurrent neural networks (RNN), have been widely established.
+[Page 2]
+However, recurrent models are fundamentally sequential in nature, which limits parallelization during training.
+
+2. Background
+The goal of reducing sequential computation also limits the efficiency of convolutional neural networks.
+Copyright © 2026 JAIR. All rights reserved.

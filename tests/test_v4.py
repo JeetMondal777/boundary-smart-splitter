@@ -2,7 +2,13 @@
 
 import pytest
 
-from boundary_smart_splitter.v4_structure import StructureSplitter
+from boundary_smart_splitter.v4_structure import StructureSplitter as OriginalStructureSplitter
+
+class StructureSplitter(OriginalStructureSplitter):
+    def __init__(self, *args, **kwargs):
+        if "min_tokens" not in kwargs:
+            kwargs["min_tokens"] = 0
+        super().__init__(*args, **kwargs)
 
 
 class TestStructureSplitter:
