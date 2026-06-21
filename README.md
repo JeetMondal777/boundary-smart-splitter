@@ -10,9 +10,73 @@ Word → Sentence → Paragraph → Section/Topic
 
 Most text splitters hit a character count and slice — regardless of whether they cut through a sentence, a paragraph, or a heading. This library flips that: **chunk_size is measured in semantic units** (words, sentences, paragraphs, sections), and `max_chars` acts only as a hard safety ceiling to protect your embedding model's context window.
 
+---
+
+## The Best of Both Worlds: Quality vs. Speed
+
+When chunking text for LLMs and RAG pipelines, developers are usually forced to choose between two extremes:
+
+1. **Naive Splitters (e.g., `RecursiveCharacterTextSplitter`)**: Orders of magnitude faster, but completely blind to structure. They routinely slice through sentences, headings, and lists, splitting a single topic across multiple chunks. This leads to **abysmal Topic Coherence** (as low as **18.5%** on complex documents).
+2. **Model-Based Splitters (e.g., `SemanticChunker`)**: Smart enough to find semantic shifts, but **extremely slow** (often 100ms–600ms+ per document), resource-heavy, and dependent on active embedding model calls or heavy Python ML libraries.
+
+**`boundary-smart-splitter` gives you the best of both worlds:**
+* **ML-Grade Quality**: By parsing the actual Markdown or HTML hierarchy, it preserves headings, lists, and tables, ensuring **Topic Coherence of up to 88%** with flawless sentence boundaries (10.0/10).
+* **Regex-Grade Speed**: Runs entirely on lightweight, deterministic Python structural rules. No heavy dependencies, no GPUs, and no LLM API calls—delivering semantic chunks in **10ms to 50ms**.
+
+---
+
 ## Benchmarks & Evaluation
 
-We evaluate `StructureSplitter` against standard LangChain splitters on real-world articles. Scores (out of 100) are weighted based on Topic Coherence (40%), Sizing Safety (30%), Processing Speed (20%), and Boundary Accuracy (10%).
+While naive character-count splitters like `RecursiveCharacterTextSplitter` are orders of magnitude faster (as they run simple regex on character counts without structural analysis), they fail to preserve context. 
+
+On real-world articles, `StructureSplitter` shows a massive win in **Topic Coherence** (up to **`88.1%` vs `18.5%`** on the Lyzr Agent Orchestration article). This translates directly to better RAG retrieval accuracy and fewer hallucinations by keeping logical sections intact.
+
+### 💡 Why do we win / tie?
+- **Irregular & Mixed Documents (Our Win Condition)**: When documents have mixed heading levels, custom lists, and uneven section lengths, naive splitters slice right through headings and split topics across chunks. `StructureSplitter` wins by massive margins.
+- **Uniform Documents (The Tie/Loss)**: On highly uniform, paragraph-structured content (like the DataCamp RAG Guide), naive splitting at double newlines (`\n\n`) naturally aligns with paragraph boundaries by luck, narrowing the quality gap while avoiding structural parsing overhead.
+
+### 📐 Evaluation Methodology & Reproducing Results
+
+Anyone can verify these benchmarks or evaluate their own splitters using the built-in `Evaluator` class:
+
+```python
+from boundary_smart_splitter import Evaluator, StructureSplitter
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+
+evaluator = Evaluator()
+
+# Option A: Compare using built-in shorthand keys (automatically imported and configured)
+# "recursive" -> RecursiveCharacterTextSplitter, "character" -> CharacterTextSplitter
+report_shorthand = evaluator.evaluate(
+    text=text, 
+    splitter=StructureSplitter(),
+    compare_with=["recursive", "character"]
+)
+
+# Option B: Pass custom pre-configured splitter instances directly
+report_custom = evaluator.evaluate(
+    text=text, 
+    splitter=StructureSplitter(max_chars=1000),
+    compare_with=[
+        RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=0)
+    ]
+)
+
+# Print a formatted Markdown comparison table of the results
+print(report_shorthand.summary())
+```
+
+#### Scoring Weights
+- **Topic Coherence (40%)**: `Heading Preservation Rate (20 pts)` + `(1.0 - Cross-topic Mixing Rate) (20 pts)`.
+- **Sizing Safety (30%)**: `(1.0 - Under 100 Tokens Rate) (15 pts)` + `(1.0 - Over 512 Tokens Rate) (15 pts)`.
+- **Processing Speed (20%)**: Stepped score based on execution time:
+  - $\le 1.0\text{ms}$: 20 pts
+  - $\le 5.0\text{ms}$: 18 pts
+  - $\le 20.0\text{ms}$: 15 pts
+  - $\le 100.0\text{ms}$: 10 pts
+  - $\le 500.0\text{ms}$: 5 pts
+  - $> 500.0\text{ms}$: 2 pts
+- **Boundary Accuracy (10%)**: Linguistic boundary score out of 10 (no mid-sentence cuts = 10 pts, mid-sentence = 6 pts, mid-word = 0 pts).
 
 ### 1. AI Agents Glossary
 
@@ -20,10 +84,10 @@ Evaluated on the [NVIDIA AI Agents Glossary Article](https://www.nvidia.com/en-u
 
 | Splitter | Overall Score (/100) | Topic Coherence | Sizing Safety | Avg Speed | Boundary Accuracy |
 |:---|:---:|:---:|:---:|:---:|:---:|
-| **StructureSplitter (Ours)** | **77.3** | **62.8%** | 90.5% | 14.36ms | **10.0/10** (Clean Sentence splits) |
-| **RecursiveCharacterTextSplitter** | **73.8** | 50.2% | 92.5% | **0.17ms** | 6.0/10 (Cuts mid-sentence) |
-| **SemanticChunker** | **55.9** | 38.0% | 85.7% | 130.35ms | **10.0/10** (Clean Sentence splits) |
-| **TokenTextSplitter** | **55.3** | 6.1% | **96.2%** | 2.59ms | 6.0/10 (Cuts mid-sentence) |
+| **StructureSplitter (Ours)** | **77.3** | **62.8%** | 90.5% | 16.50ms | **10.0/10** (Clean Sentence splits) |
+| **RecursiveCharacterTextSplitter** | **73.8** | 50.2% | 92.5% | **0.19ms** | 6.0/10 (Cuts mid-sentence) |
+| **TokenTextSplitter** | **55.3** | 6.1% | **96.2%** | 2.42ms | 6.0/10 (Cuts mid-sentence) |
+| **SemanticChunker** | **54.0** | 33.1% | 85.7% | 127.08ms | **10.0/10** (Clean Sentence splits) |
 
 ### 2. RAG Complete Guide
 
@@ -32,9 +96,9 @@ Evaluated on the [DataCamp RAG Complete Guide Article](https://www.datacamp.com/
 | Splitter | Overall Score (/100) | Topic Coherence | Sizing Safety | Avg Speed | Boundary Accuracy |
 |:---|:---:|:---:|:---:|:---:|:---:|
 | **RecursiveCharacterTextSplitter** | **82.3** | 65.6% | 86.8% | **0.10ms** | **10.0/10** (Paragraph aligned) |
-| **StructureSplitter (Ours)** | **79.9** | **70.2%** | **89.5%** | 14.05ms | **10.0/10** (Clean Sentence splits) |
-| **TokenTextSplitter** | **55.2** | 6.2% | **95.8%** | 2.20ms | 6.0/10 (Cuts mid-sentence) |
-| **SemanticChunker** | **50.8** | 30.6% | 78.6% | 131.17ms | **10.0/10** (Clean Sentence splits) |
+| **StructureSplitter (Ours)** | **79.9** | **70.2%** | **89.5%** | 11.41ms | **10.0/10** (Clean Sentence splits) |
+| **TokenTextSplitter** | **55.2** | 6.2% | **95.8%** | 2.08ms | 6.0/10 (Cuts mid-sentence) |
+| **SemanticChunker** | **51.6** | 32.6% | 78.6% | 132.00ms | **10.0/10** (Clean Sentence splits) |
 
 ### 3. Agent Orchestration
 
@@ -42,10 +106,10 @@ Evaluated on the [Lyzr Agent Orchestration Article](https://www.lyzr.ai/blog/age
 
 | Splitter | Overall Score (/100) | Topic Coherence | Sizing Safety | Avg Speed | Boundary Accuracy |
 |:---|:---:|:---:|:---:|:---:|:---:|
-| **StructureSplitter (Ours)** | **80.8** | **88.1%** | 85.2% | 44.63ms | **10.0/10** (Clean Sentence splits) |
-| **RecursiveCharacterTextSplitter** | **62.9** | 18.5% | 98.4% | **0.43ms** | 6.0/10 (Cuts mid-sentence) |
-| **SemanticChunker** | **58.6** | 47.3% | 82.1% | 289.44ms | **10.0/10** (Clean Sentence splits) |
-| **TokenTextSplitter** | **52.7** | 11.6% | **100.0%** | 4.75ms | 0.0/10 (Cuts mid-word) |
+| **StructureSplitter (Ours)** | **80.8** | **88.1%** | 85.2% | 50.46ms | **10.0/10** (Clean Sentence splits) |
+| **RecursiveCharacterTextSplitter** | **62.9** | 18.5% | 98.4% | **0.44ms** | 6.0/10 (Cuts mid-sentence) |
+| **SemanticChunker** | **50.9** | 43.7% | 71.4% | 684.26ms | **10.0/10** (Clean Sentence splits) |
+| **TokenTextSplitter** | **49.7** | 11.6% | **100.0%** | 7.02ms | 0.0/10 (Cuts mid-word) |
 
 ---
 
@@ -180,8 +244,8 @@ splitter = ParagraphSplitter(
 Respects headings, numbered sections, and transition phrases. `chunk_size` = number of sections.
 
 ```python
+import tiktoken
 from boundary_smart_splitter import StructureSplitter
-from tiktoken import tiktoken #Optional Dependency For token aware splitting (recommended)
 
 text = """
 # Intro
@@ -311,6 +375,7 @@ splitter = StructureSplitter(
 All splitters support token-aware splitting. While `max_chars` limits chunks by character length, you can also enforce `max_tokens` (measured using `tiktoken` or a custom callable).
 
 ```python
+import tiktoken
 from boundary_smart_splitter import StructureSplitter
 
 splitter = StructureSplitter(
@@ -364,6 +429,7 @@ This ensures you **never** exceed your model constraints, while always maintaini
 All splitters have LangChain-compatible wrappers. The core never imports LangChain — wrappers are optional.
 
 ```python
+import tiktoken
 from boundary_smart_splitter.langchain import (
     LangChainWordSplitter,
     LangChainSentenceSplitter,
